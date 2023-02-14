@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hive-metastore.name" . }}
+  labels:
+    app: {{ template "hive-metastore.name" . }}
+    chart: {{ template "hive-metastore.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: thrift
+      port: 9083
+  selector:
+    app: {{ template "hive-metastore.name" . }}
+    release: {{ .Release.Name }}
+    component: hive-metastore

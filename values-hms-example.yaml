@@ -1,0 +1,15 @@
+db:
+  type: postgres
+  connectionURL: jdbc:postgresql://host.docker.internal:5432/hms_db
+  user: deep_hms
+  password: deep_hms
+
+s3:
+  endpoint: s3.amazonaws.com.cn
+  accessKey: XXXXXXX
+  secrectKey: XXXXXXXXXXXXXXX
+
+metastore: 
+  warehouse: s3a://dlink-public/
+
+nameOverride: hms-s3

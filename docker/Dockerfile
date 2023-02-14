@@ -1,0 +1,63 @@
+FROM openjdk:8-jre-slim as builder
+WORKDIR /opt
+ENV HADOOP_VERSION=3.3.1
+ENV METASTORE_VERSION=3.1.2
+ENV PSQL_CONN_VERSION=42.3.1
+ENV LOG4J_WEB_VERSION=2.17.1
+ENV RM_HADOOP_LOG4J_VERSION=1.7.30
+ENV HADOOP_HOME=/opt/hadoop-${HADOOP_VERSION}
+ENV HIVE_HOME=/opt/apache-hive-metastore-${METASTORE_VERSION}-bin
+
+RUN apt update && \
+    apt install -y curl && \
+    # add `hadoop`
+    curl -L https://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}.tar.gz | tar zxf - && \
+    # remove the redundant `log4j-slf4j` jar -- redundant to one in `hive-standalone-metastore`
+    rm ${HADOOP_HOME}/share/hadoop/common/lib/slf4j-log4j12-${RM_HADOOP_LOG4J_VERSION}.jar && \
+    # add `hive-standalone-metastore`
+    curl -L https://repo1.maven.org/maven2/org/apache/hive/hive-standalone-metastore/${METASTORE_VERSION}/hive-standalone-metastore-${METASTORE_VERSION}-bin.tar.gz | tar zxf - && \
+    # add the `hive-metastore` jar
+    curl -L https://repo1.maven.org/maven2/org/apache/hive/hive-metastore/${METASTORE_VERSION}/hive-metastore-${METASTORE_VERSION}.jar -o hive-metastore-${METASTORE_VERSION}.jar && \
+    cp hive-metastore-${METASTORE_VERSION}.jar ${HIVE_HOME}/lib/ && \
+    rm hive-metastore-${METASTORE_VERSION}.jar && \
+    # add the postgresql jdbc driver
+    curl -L https://jdbc.postgresql.org/download/postgresql-${PSQL_CONN_VERSION}.jar -o postgresql-${PSQL_CONN_VERSION}.jar && \
+    cp postgresql-${PSQL_CONN_VERSION}.jar ${HIVE_HOME}/lib/ && \
+    rm  postgresql-${PSQL_CONN_VERSION}.jar && \
+    # add the mysql8 jdbc driver
+    curl -L https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-8.0.19.tar.gz | tar zxf - && \
+    cp mysql-connector-java-8.0.19/mysql-connector-java-8.0.19.jar ${HIVE_HOME}/lib/ && \
+    rm -rf mysql-connector-java-8.0.19 && \
+    # add the `log4j-web` jar to support web servlet containers
+    curl -L https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-web/${LOG4J_WEB_VERSION}/log4j-web-${LOG4J_WEB_VERSION}.jar -o log4j-web-${LOG4J_WEB_VERSION}.jar && \
+    cp log4j-web-${LOG4J_WEB_VERSION}.jar ${HIVE_HOME}/lib/ && \
+    rm log4j-web-${LOG4J_WEB_VERSION}.jar
+
+FROM openjdk:8-jre-slim as runner
+WORKDIR /opt
+ENV HADOOP_VERSION=3.3.1
+ENV METASTORE_VERSION=3.1.2
+ENV HADOOP_HOME=/opt/hadoop-${HADOOP_VERSION}
+ENV HIVE_HOME=/opt/apache-hive-metastore-${METASTORE_VERSION}-bin
+COPY --from=builder ${HIVE_HOME} ${HIVE_HOME}
+COPY --from=builder ${HADOOP_HOME} ${HADOOP_HOME}
+COPY /conf/metastore-site.postgres.xml ${HIVE_HOME}/conf/metastore-site.xml
+
+COPY scripts/entrypoint-run.sh bin/entrypoint.sh
+RUN chmod 775 bin/entrypoint.sh
+
+ENV AWS_SDK_VERSION=1.11.901
+ENV JAVA_HOME=/usr/local/openjdk-8
+ENV HADOOP_CLASSPATH=${HADOOP_HOME}/share/hadoop/tools/lib/aws-java-sdk-bundle-${AWS_SDK_VERSION}.jar:${HADOOP_HOME}/share/hadoop/tools/lib/hadoop-aws-${HADOOP_VERSION}.jar
+
+# create hive-metastore as mount point for k8s configmap
+RUN ln -s ${HIVE_HOME} hive-metastore
+
+RUN groupadd -r hive --gid=1000 && \
+    useradd -r -g hive --uid=1000 -d ${HIVE_HOME} hive && \
+    chown hive:hive -R ${HIVE_HOME} &&\
+    chown hive:hive -R hive-metastore
+USER hive
+EXPOSE 9083
+
+ENTRYPOINT ["bin/entrypoint.sh"]

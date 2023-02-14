@@ -1,0 +1,129 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "hive-metastore.name" . }}-config
+  labels:
+    app: {{ template "hive-metastore.name" . }}
+    chart: {{ template "hive-metastore.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+data:
+  metastore-site.xml: |
+    <configuration>
+      <property>
+        <name>metastore.thrift.uris</name>
+        <value>thrift://0.0.0.0:9083</value>
+        <description>Thrift URI for the remote metastore. Used by metastore client to connect to remote metastore.</description>
+      </property>
+      <property>
+        <name>metastore.task.threads.always</name>
+        <value>org.apache.hadoop.hive.metastore.events.EventCleanerTask</value>
+      </property>
+      <property>
+        <name>metastore.expression.proxy</name>
+        <value>org.apache.hadoop.hive.metastore.DefaultPartitionExpressionProxy</value>
+      </property>
+
+       <property>
+        <name>metastore.server.max.message.size</name>
+        <value>104857600</value>
+        <description>Maximum message size in bytes a HMS will accept.</description>
+      </property>
+        <property>
+        <name>metastore.server.max.threads</name>
+        <value>1000</value>
+        <description>Maximum number of worker threads in the Thrift server's pool.</description>
+      </property>
+      <property>
+        <name>metastore.server.min.threads</name>
+        <value>200</value>
+        <description>Minimum number of worker threads in the Thrift server's pool.</description>
+      </property>
+      <property>
+          <name>metastore.thrift.port</name>
+          <value>9083</value>
+          <description>Hive metastore listener port</description>
+      </property>
+      <property>
+          <name>metastore.warehouse.dir</name>
+          <value>{{ .Values.metastore.warehouse }}</value>
+          <description>location of default database for the warehouse</description>
+      </property>
+      
+      <property>
+        <name>javax.jdo.option.ConnectionDriverName</name>
+        {{- if eq .Values.db.type "postgres" }}
+        <value>org.postgresql.Driver</value>
+        {{- end }}
+        {{- if eq .Values.db.type "mysql" }}
+        <value>com.mysql.jdbc.Driver</value>
+        {{- end }}
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionURL</name>
+        <value>{{ .Values.db.connectionURL }}</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionUserName</name>
+        <value>{{ .Values.db.user }}</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionPassword</name>
+        <value>{{ .Values.db.password }}</value>
+      </property>
+
+      <property>
+        <name>fs.s3a.access.key</name>
+        <value>{{ .Values.s3.accessKey }}</value>
+      </property>
+      <property>
+        <name>fs.s3a.secret.key</name>
+        <value>{{ .Values.s3.secrectKey }}</value>
+      </property>
+      <property>
+        <name>fs.s3a.endpoint</name>
+        <value>{{ .Values.s3.endpoint }}</value>
+      </property>
+      <!--property>
+        <name>fs.s3a.endpoint.region</name>
+        <value>cn-northwest-1</value>
+      </property-->
+      <property>
+        <name>fs.s3a.path.style.access</name>
+        <value>true</value>
+      </property>
+      <property>
+        <name>fs.s3a.impl</name>
+        <value>org.apache.hadoop.fs.s3a.S3AFileSystem</value>
+      </property>
+      <property>
+        <name>fs.s3a.aws.credentials.provider</name>
+        <value>org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider</value>
+      </property>
+      <!--property>
+        <name>fs.s3a.connection.ssl.enabled</name>
+        <value>false</value>
+        <description>Enables or disables SSL connections to S3.</description>
+      </property-->
+      <property>
+        <name>fs.s3a.bucket.probe</name>
+        <value>0</value>
+        <description>
+            The value can be 0 (default), 1 or 2.
+            When set to 0, bucket existence checks won't be done
+            during initialization thus making it faster.
+            Though it should be noted that when the bucket is not available in S3,
+            or if fs.s3a.endpoint points to the wrong instance of a private S3 store
+            consecutive calls like listing, read, write etc. will fail with
+            an UnknownStoreException.
+            When set to 1, the bucket existence check will be done using the
+            V1 API of the S3 protocol which doesn't verify the client's permissions
+            to list or read data in the bucket.
+            When set to 2, the bucket existence check will be done using the
+            V2 API of the S3 protocol which does verify that the
+            client has permission to read the bucket.
+        </description>
+      </property>
+    </configuration>
+
+  
